@@ -55,6 +55,7 @@ enum _:RestrictionData
 }
 
 new const g_szCommandArg[] = "$cmd$"
+new const g_szNoMessageArg[] = "#none"
 new const g_szLogs[] = "CommandRestrictions.log"
 new const g_szFilename[] = "CommandRestrictions.ini"
 
@@ -419,6 +420,9 @@ bool:is_restricted(const id, const szCommand[])
 	{
 		if(eItem[Message][0])
 		{
+			if(equal(eItem[Message], g_szNoMessageArg))
+				return true
+				
 			static szMessage[MAX_MSG_LENGTH]
 			copy(szMessage, charsmax(szMessage), eItem[Message])
 			replace_all(szMessage, charsmax(szMessage), g_szCommandArg, szCommand)
