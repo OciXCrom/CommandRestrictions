@@ -5,14 +5,21 @@
 //Comment this line to use on a mod different than Counter-Strike.
 #define USE_CSTRIKE
 
+//Uncomment to log restrictions in the server's console.
+//#define CRX_CMDRESTRICTIONS_DEBUG
+
 #if defined USE_CSTRIKE
 	#include <cstrike>
 #endif
 
-#define PLUGIN_VERSION "1.0"
+#define PLUGIN_VERSION "1.1"
 #define CMD_ARG_SAY "say"
 #define CMD_ARG_SAYTEAM "say_team"
 #define MAX_COMMANDS 128
+#define MAX_CMDLINE_LENGTH 128
+#define MAX_STATUS_LENGTH 12
+#define MAX_TYPE_LENGTH 12
+#define MAX_MSG_LENGTH 160
 #define INVALID_ENTRY -1
 
 enum _:Types
@@ -43,9 +50,11 @@ enum _:RestrictionData
 	CsTeams:ValueTeam,
 	#endif
 	ValueString[35],
-	ValueInt
+	ValueInt,
+	Message[MAX_MSG_LENGTH]
 }
 
+new const g_szCommandArg[] = "$cmd$"
 new const g_szLogs[] = "CommandRestrictions.log"
 new const g_szFilename[] = "CommandRestrictions.ini"
 
@@ -53,7 +62,8 @@ new Array:g_aRestrictions[MAX_COMMANDS],
 	Trie:g_tCommands,
 	g_ePlayerData[33][PlayerData],
 	g_iTotalCommands = INVALID_ENTRY,
-	g_iRestrictions[MAX_COMMANDS]
+	g_iRestrictions[MAX_COMMANDS],
+	g_szQueue[MAX_CMDLINE_LENGTH]
 
 public plugin_init()
 {
@@ -110,7 +120,8 @@ ReadFile()
 	
 	if(iFilePointer)
 	{
-		new szData[59], szStatus[12], szType[12], eItem[RestrictionData], iSize, iLine
+		new szData[MAX_CMDLINE_LENGTH + MAX_STATUS_LENGTH + MAX_TYPE_LENGTH + MAX_MSG_LENGTH], szStatus[MAX_TYPE_LENGTH], szType[MAX_STATUS_LENGTH],\
+		eItem[RestrictionData], bool:bQueue, iSize, iLine
 		
 		while(!feof(iFilePointer))
 		{
@@ -123,6 +134,9 @@ ReadFile()
 				case EOS, ';': continue
 				case '[':
 				{
+					if(bQueue && g_iTotalCommands > INVALID_ENTRY)
+						register_commands_in_queue()
+						
 					iSize = strlen(szData)
 					
 					if(szData[iSize - 1] != ']')
@@ -135,6 +149,14 @@ ReadFile()
 					szData[iSize - 1] = ' '
 					trim(szData)
 					
+					if(contain(szData, ",") != -1)
+					{
+						strtok(szData, szData, charsmax(szData), g_szQueue, charsmax(g_szQueue), ',')
+						trim(szData); trim(g_szQueue)
+						bQueue = true
+					}
+					else bQueue = false
+					
 					if(contain(szData, CMD_ARG_SAY) != -1)
 					{
 						replace(szData, charsmax(szData), CMD_ARG_SAY, "")
@@ -145,11 +167,16 @@ ReadFile()
 						
 					g_aRestrictions[++g_iTotalCommands] = ArrayCreate(RestrictionData)
 					TrieSetCell(g_tCommands, szData, g_iTotalCommands)
+					
+					#if defined CRX_CMDRESTRICTIONS_DEBUG
+					log_config_error(_, "RN #%i: %s", g_iTotalCommands, szData)
+					#endif
 				}
 				default:
 				{
 					eItem[ValueString][0] = EOS
-					parse(szData, szStatus, charsmax(szStatus), szType, charsmax(szType), eItem[ValueString], charsmax(eItem[ValueString]))
+					eItem[Message][0] = EOS
+					parse(szData, szStatus, charsmax(szStatus), szType, charsmax(szType), eItem[ValueString], charsmax(eItem[ValueString]), eItem[Message], charsmax(eItem[Message]))
 					
 					switch(szStatus[0])
 					{
@@ -268,11 +295,19 @@ ReadFile()
 		
 		fclose(iFilePointer)
 		
+		if(bQueue)
+			register_commands_in_queue()
+		
 		if(g_iTotalCommands == INVALID_ENTRY)
 		{
-			log_config_error(INVALID_ENTRY, "No command restrictions found.")
+			log_config_error(_, "No command restrictions found.")
 			pause("ad")
 		}
+	}
+	else
+	{
+		log_config_error(_, "Configuration file not found or cannot be opened.")
+		pause("ad")
 	}
 }
 
@@ -382,13 +417,46 @@ bool:is_restricted(const id, const szCommand[])
 	
 	if(bBlock)
 	{
-		client_print(id, print_console, "%L (%s)", id, "NO_ACC_COM", szCommand)
-		CC_SendMessage(id, "&x07%L &x01(&x04%s&x01)", id, "NO_ACC_COM", szCommand)
+		if(eItem[Message][0])
+		{
+			static szMessage[MAX_MSG_LENGTH]
+			copy(szMessage, charsmax(szMessage), eItem[Message])
+			replace_all(szMessage, charsmax(szMessage), g_szCommandArg, szCommand)
+			client_print(id, print_console, szMessage)
+			CC_SendMessage(id, szMessage)
+		}
+		else
+		{
+			client_print(id, print_console, "%L (%s)", id, "NO_ACC_COM", szCommand)
+			CC_SendMessage(id, "&x07%L &x01(&x04%s&x01)", id, "NO_ACC_COM", szCommand)
+		}
+		
 		return true
 	}
 	
 	return false
-}	
+}
+
+register_commands_in_queue()
+{
+	static szData[MAX_CMDLINE_LENGTH], iPrevious
+	
+	while(g_szQueue[0] != 0 && strtok(g_szQueue, szData, charsmax(szData), g_szQueue, charsmax(g_szQueue), ','))
+	{
+		iPrevious = g_iTotalCommands
+		trim(g_szQueue); trim(szData)
+		register_clcmd(szData, "OnRestrictedCommand")
+		g_aRestrictions[++g_iTotalCommands] = ArrayClone(g_aRestrictions[iPrevious])
+		TrieSetCell(g_tCommands, szData, g_iTotalCommands)
+		g_iRestrictions[g_iTotalCommands] = g_iRestrictions[iPrevious]
+		
+		#if defined CRX_CMDRESTRICTIONS_DEBUG
+		log_config_error(_, "RQ #%i: %s", g_iTotalCommands, szData)
+		#endif
+	}
+
+	g_szQueue[0] = EOS
+}
 
 log_config_error(const iLine = INVALID_ENTRY, const szInput[], any:...)
 {
