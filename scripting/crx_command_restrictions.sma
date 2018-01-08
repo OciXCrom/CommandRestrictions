@@ -163,9 +163,8 @@ ReadFile()
 						replace(szData, charsmax(szData), CMD_ARG_SAY, "")
 						trim(szData)
 					}
-					else
-						register_clcmd(szData, "OnRestrictedCommand")
-						
+					else register_clcmd(szData, "OnRestrictedCommand")
+					
 					g_aRestrictions[++g_iTotalCommands] = ArrayCreate(RestrictionData)
 					TrieSetCell(g_tCommands, szData, g_iTotalCommands)
 					
@@ -335,6 +334,7 @@ bool:is_restricted(const id, const szCommand[])
 {
 	static eItem[RestrictionData], bool:bBlock, iCommand, iAlive, i
 	TrieGetCell(g_tCommands, szCommand, iCommand)
+	CC_SendMessage(id, "checking %s", szCommand)
 	bBlock = false
 	
 	#if defined USE_CSTRIKE
@@ -449,7 +449,14 @@ register_commands_in_queue()
 	{
 		iPrevious = g_iTotalCommands
 		trim(g_szQueue); trim(szData)
-		register_clcmd(szData, "OnRestrictedCommand")
+		
+		if(contain(szData, CMD_ARG_SAY) != -1)
+		{
+			replace(szData, charsmax(szData), CMD_ARG_SAY, "")
+			trim(szData)
+		}
+		else register_clcmd(szData, "OnRestrictedCommand")
+		
 		g_aRestrictions[++g_iTotalCommands] = ArrayClone(g_aRestrictions[iPrevious])
 		TrieSetCell(g_tCommands, szData, g_iTotalCommands)
 		g_iRestrictions[g_iTotalCommands] = g_iRestrictions[iPrevious]
