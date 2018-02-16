@@ -12,7 +12,7 @@
 	#include <cstrike>
 #endif
 
-#define PLUGIN_VERSION "1.1"
+#define PLUGIN_VERSION "1.2"
 #define CMD_ARG_SAY "say"
 #define CMD_ARG_SAYTEAM "say_team"
 #define MAX_COMMANDS 128
@@ -247,10 +247,10 @@ ReadFile()
 							
 							switch(eItem[ValueString][0])
 							{
-								case 'C', 'c': eItem[ValueTeam] = CS_TEAM_CT
-								case 'T', 't': eItem[ValueTeam] = CS_TEAM_T
-								case 'S', 's': eItem[ValueTeam] = CS_TEAM_SPECTATOR
-								case 'U', 'u': eItem[ValueTeam] = CS_TEAM_UNASSIGNED
+								case 'C', 'c': eItem[ValueTeam] = _:CS_TEAM_CT
+								case 'T', 't': eItem[ValueTeam] = _:CS_TEAM_T
+								case 'S', 's': eItem[ValueTeam] = _:CS_TEAM_SPECTATOR
+								case 'U', 'u': eItem[ValueTeam] = _:CS_TEAM_UNASSIGNED
 								default:
 								{
 									log_config_error(iLine, "Unknown team name ^"%s^"", eItem[ValueString])
@@ -334,7 +334,6 @@ bool:is_restricted(const id, const szCommand[])
 {
 	static eItem[RestrictionData], bool:bBlock, iCommand, iAlive, i
 	TrieGetCell(g_tCommands, szCommand, iCommand)
-	CC_SendMessage(id, "checking %s", szCommand)
 	bBlock = false
 	
 	#if defined USE_CSTRIKE
@@ -443,11 +442,10 @@ bool:is_restricted(const id, const szCommand[])
 
 register_commands_in_queue()
 {
-	static szData[MAX_CMDLINE_LENGTH], iPrevious
+	static szData[MAX_CMDLINE_LENGTH]
 	
 	while(g_szQueue[0] != 0 && strtok(g_szQueue, szData, charsmax(szData), g_szQueue, charsmax(g_szQueue), ','))
 	{
-		iPrevious = g_iTotalCommands
 		trim(g_szQueue); trim(szData)
 		
 		if(contain(szData, CMD_ARG_SAY) != -1)
@@ -456,10 +454,7 @@ register_commands_in_queue()
 			trim(szData)
 		}
 		else register_clcmd(szData, "OnRestrictedCommand")
-		
-		g_aRestrictions[++g_iTotalCommands] = ArrayClone(g_aRestrictions[iPrevious])
 		TrieSetCell(g_tCommands, szData, g_iTotalCommands)
-		g_iRestrictions[g_iTotalCommands] = g_iRestrictions[iPrevious]
 		
 		#if defined CRX_CMDRESTRICTIONS_DEBUG
 		log_config_error(_, "RQ #%i: %s", g_iTotalCommands, szData)
