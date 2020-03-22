@@ -37,7 +37,7 @@
 
 const MAX_FILE_PATH_LENGTH = 256
 
-new const PLUGIN_VERSION[]  = "1.3"
+new const PLUGIN_VERSION[]  = "1.4"
 new const CMD_ARG_SAY[]     = "say"
 new const CMD_ARG_SAYTEAM[] = "say_team"
 new const TIME_FORMAT[]     = "%H:%M"
@@ -61,7 +61,8 @@ enum _:Types
 	TYPE_TEAM,
 	#endif
 	TYPE_LIFE,
-	TYPE_TIME
+	TYPE_TIME,
+	TYPE_MAP
 }
 
 enum _:PlayerData
@@ -95,6 +96,7 @@ new g_ePlayerData[MAX_PLAYERS + 1][PlayerData]
 new g_iTotalCommands = INVALID_ENTRY
 new g_iRestrictions[MAX_COMMANDS]
 new g_szQueue[MAX_CMDLINE_LENGTH]
+new g_szMap[MAX_NAME_LENGTH]
 new g_fwdUserNameChanged
 
 public plugin_init()
@@ -108,6 +110,7 @@ public plugin_init()
 
 public plugin_precache()
 {
+	get_mapname(g_szMap, charsmax(g_szMap))
 	register_clcmd(CMD_ARG_SAY, "OnSay")
 	register_clcmd(CMD_ARG_SAYTEAM, "OnSay")
 	g_tCommands = TrieCreate()
@@ -161,7 +164,7 @@ ReadFile()
 	{
 		new szData[MAX_CMDLINE_LENGTH + MAX_STATUS_LENGTH + MAX_TYPE_LENGTH + MAX_MSG_LENGTH], szStatus[MAX_TYPE_LENGTH], szType[MAX_STATUS_LENGTH]
 		new eItem[RestrictionData], Regex:iRegex, bool:bQueue, iSize, iLine, i
-		new szTemp[2][MAX_TIME_LENGTH]
+		new szTemp[2][MAX_TIME_LENGTH], szKey[MAX_NAME_LENGTH], szValue[MAX_NAME_LENGTH]
 
 		while(!feof(iFilePointer))
 		{
@@ -283,11 +286,11 @@ ReadFile()
 								continue
 							}
 						}
-						#if defined USE_CSTRIKE
 						case 'T', 't':
 						{
 							switch(szType[1])
 							{
+								#if defined USE_CSTRIKE
 								case 'E', 'e':
 								{
 									eItem[Type] = TYPE_TEAM
@@ -311,6 +314,7 @@ ReadFile()
 										}
 									}
 								}
+								#endif
 								case 'I', 'i':
 								{
 									eItem[Type] = TYPE_TIME
@@ -343,7 +347,6 @@ ReadFile()
 								}
 							}
 						}
-						#endif
 						case 'L', 'l':
 						{
 							eItem[Type] = TYPE_LIFE
@@ -363,6 +366,27 @@ ReadFile()
 									log_config_error(iLine, "Unknown life status ^"%s^"", eItem[ValueString])
 									continue
 								}
+							}
+						}
+						case 'M', 'm':
+						{
+							eItem[Type] = TYPE_MAP
+
+							if(!eItem[ValueString][0])
+							{
+								log_config_error(iLine, "Map name not specified")
+								continue
+							}
+
+							if(contain(eItem[ValueString], "*") != -1)
+							{
+								strtok(eItem[ValueString], szKey, charsmax(szKey), szValue, charsmax(szValue), '*')
+								copy(szValue, strlen(szKey), g_szMap)
+								eItem[ValueInt][0] = equal(szValue, szKey)
+							}
+							else
+							{
+								eItem[ValueInt][0] = equali(eItem[ValueString], g_szMap)
 							}
 						}
 						default:
@@ -427,10 +451,10 @@ bool:is_restricted(const id, const szCommand[])
 
 	#if defined USE_CSTRIKE
 	static CsTeams:iTeam
+	iTeam = cs_get_user_team(id)
 	#endif
 
 	iAlive = is_user_alive(id)
-	iTeam = cs_get_user_team(id)
 
 	for(i = 0; i < g_iRestrictions[iCommand]; i++)
 	{
@@ -515,16 +539,26 @@ bool:is_restricted(const id, const szCommand[])
 			}
 			case TYPE_TIME:
 			{
-				CromChat(0, "checking if hrs %i - %i", eItem[ValueInt][0], eItem[ValueInt][1])
 				if(is_current_time(eItem[ValueInt][0], eItem[ValueInt][1]))
 				{
-					CromChat(0, "yes")
 					bBlock = eItem[Block]
 
 					if(bBlock)
 					{
 						break
 					}
+				}
+			}
+			case TYPE_MAP:
+			{
+				if(eItem[ValueInt][0])
+				{
+					bBlock = eItem[Block]
+				}
+
+				if(bBlock)
+				{
+					break
 				}
 			}
 		}
