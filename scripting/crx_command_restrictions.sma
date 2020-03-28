@@ -50,7 +50,7 @@ new const g_szNatives[][] =
 	const MAX_AUTHID_LENGTH = 64
 #endif
 
-new const PLUGIN_VERSION[]  = "2.0"
+new const PLUGIN_VERSION[]  = "2.0.1"
 new const CMD_ARG_SAY[]     = "say"
 new const CMD_ARG_SAYTEAM[] = "say_team"
 new const TIME_FORMAT[]     = "%H:%M"
@@ -285,6 +285,7 @@ ReadFile()
 					if(contain(szData, CMD_ARG_SAY) != -1)
 					{
 						replace(szData, charsmax(szData), CMD_ARG_SAY, "")
+						strtolower(szData)
 						trim(szData)
 					}
 					else
@@ -537,6 +538,7 @@ public OnSay(id)
 
 	read_argv(1, szArg, charsmax(szArg))
 	parse(szArg, szCommand, charsmax(szCommand), szArg, charsmax(szArg))
+	strtolower(szCommand)
 
 	if(!TrieKeyExists(g_tCommands, szCommand))
 	{
