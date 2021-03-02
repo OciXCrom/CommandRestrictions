@@ -50,7 +50,7 @@ new const g_szNatives[][] =
 	const MAX_AUTHID_LENGTH = 64
 #endif
 
-new const PLUGIN_VERSION[]  = "2.0.1"
+new const PLUGIN_VERSION[]  = "2.1"
 new const CMD_ARG_SAY[]     = "say"
 new const CMD_ARG_SAYTEAM[] = "say_team"
 new const TIME_FORMAT[]     = "%H:%M"
@@ -84,7 +84,8 @@ enum _:Types
 	TYPE_TIME,
 	TYPE_MAP,
 	TYPE_CRXRANKS_LEVEL,
-	TYPE_CRXRANKS_XP
+	TYPE_CRXRANKS_XP,
+	TYPE_PLAYERS
 }
 
 enum _:PlayerData
@@ -500,6 +501,11 @@ ReadFile()
 						eItem[Type] = TYPE_CRXRANKS_XP
 						eItem[ValueInt][0] = str_to_num(eItem[ValueString])
 					}
+					else if(equal(szType, "players"))
+					{
+						eItem[Type] = TYPE_PLAYERS
+						eItem[ValueInt][0] = clamp(str_to_num(eItem[ValueString]), 0, MAX_PLAYERS)
+					}
 					else
 					{
 						log_config_error(iLine, "Unknown restriction type ^"%s^"", szType)
@@ -702,6 +708,13 @@ bool:is_restricted(const id, const szCommand[])
 			case TYPE_CRXRANKS_XP:
 			{
 				if(crxranks_get_user_xp(id) >= eItem[ValueInt][0])
+				{
+					bMatch = true
+				}
+			}
+			case TYPE_PLAYERS:
+			{
+				if(get_playersnum() >= eItem[ValueInt][0])
 				{
 					bMatch = true
 				}
